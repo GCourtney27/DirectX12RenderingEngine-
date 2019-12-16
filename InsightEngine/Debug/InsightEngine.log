@@ -1,4 +1,0 @@
-﻿  Graphics.cpp
-C:\VSDev\ComputerGraphics\VS2019\InsightEngine\InsightEngine\Graphics\Graphics.cpp(394,19): warning C4244:  '=': conversion from 'int' to 'FLOAT', possible loss of data
-C:\VSDev\ComputerGraphics\VS2019\InsightEngine\InsightEngine\Graphics\Graphics.cpp(395,20): warning C4244:  '=': conversion from 'int' to 'FLOAT', possible loss of data
-  InsightEngine.vcxproj -> C:\VSDev\ComputerGraphics\VS2019\InsightEngine\Debug\InsightEngine.exe

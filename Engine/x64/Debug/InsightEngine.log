@@ -1,0 +1,18 @@
+﻿  compilation object save succeeded; see C:\VSDev\ComputerGraphics\VS2019\InsightEngine\x64\Debug\PixelShader.cso
+  compilation object save succeeded; see C:\VSDev\ComputerGraphics\VS2019\InsightEngine\x64\Debug\VertexShader.cso
+  Engine.cpp
+  ErrorLogger.cpp
+  AdapterReader.cpp
+  Graphics.cpp
+  KeyboardClass.cpp
+  KeyboardEvent.cpp
+  MouseClass.cpp
+  MouseEvent.cpp
+  RenderWindow.cpp
+  Source.cpp
+  StringHelper.cpp
+  WindowContainer.cpp
+C:\VSDev\ComputerGraphics\VS2019\InsightEngine\InsightEngine\RenderWindow.cpp(83): warning C4715:  'HandleMsgRedirect': not all control paths return a value
+C:\VSDev\ComputerGraphics\VS2019\InsightEngine\InsightEngine\Graphics\Graphics.cpp(394,19): warning C4244:  '=': conversion from 'int' to 'FLOAT', possible loss of data
+C:\VSDev\ComputerGraphics\VS2019\InsightEngine\InsightEngine\Graphics\Graphics.cpp(395,20): warning C4244:  '=': conversion from 'int' to 'FLOAT', possible loss of data
+  InsightEngine.vcxproj -> C:\VSDev\ComputerGraphics\VS2019\InsightEngine\x64\Debug\InsightEngine.exe
