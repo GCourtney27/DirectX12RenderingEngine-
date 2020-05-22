@@ -21,6 +21,7 @@ bool Graphics::Initialize(HWND hwnd, int width, int height)
 
 	CreateRaytracingPipeline();
 	CreateRaytracingOutputBuffer();
+	CreateCameraBuffer();
 	CreateShaderResourceHeap();
 	CreateShaderBindingTable();
 
@@ -593,6 +594,7 @@ bool Graphics::InitializeDirect3D12(HWND hwnd)
 	pDevice->CreateDepthStencilView(pDepthStencilBuffer.Get(), &depthStencilDesc, pDSDescriptorHeap.Get()->GetCPUDescriptorHandleForHeapStart());
 
 
+
 	// Create the constant buffer resource heap
 	// We will update the constant buffer one or more times per frame, so we will use only an upload heap
 	// unlike previously we used an upload heap to upload the vertex and idndex data, and then copied over 
@@ -716,16 +718,15 @@ bool Graphics::InitializeDirect3D12(HWND hwnd)
 	pDevice->CreateShaderResourceView(pTextureBuffer.Get(), &srvDesc, pMainDescriptorHeap->Get()->GetCPUDescriptorHandleForHeapStart());
 
 
-	// -- Initialize Ry Tracing -- //
+
+
+#pragma region Initialize Ray Tracing
+
 	CheckRayTracingSupport();
 
 	CreateAccelerationStructures();
 
-
-
-
-
-
+#pragma endregion Initialize Ray Tracing
 
 
 
@@ -861,10 +862,6 @@ void Graphics::UpdatePipeline()
 	pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
 	
-
-	// Clear the depth/stencil buffer
-	pCommandList->ClearDepthStencilView(pDSDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
 	// Set Root signature
 	pCommandList->SetGraphicsRootSignature(pRootSignature.Get());
 
@@ -876,6 +873,9 @@ void Graphics::UpdatePipeline()
 
 	if (m_raster)
 	{
+		// Clear the depth/stencil buffer
+		pCommandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
 		// Clear the render targets by using the ClearRenderTargetView command
 		const float clearColor[] = { 0.1f, 0.1f, 0.1f, 1.0f };
 		pCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
@@ -884,6 +884,24 @@ void Graphics::UpdatePipeline()
 		pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // Set the primitive topology
 		pCommandList->IASetVertexBuffers(0, 1, &vertexbufferView); // Set the vertex buffer (using the vertex buffer view)
 		pCommandList->IASetIndexBuffer(&indexBufferView);
+
+		// First cube
+		// Set cube1's constant buffer
+		pCommandList->SetGraphicsRootConstantBufferView(0, pConstantBufferUploadHeaps[frameIndex].Get()->GetGPUVirtualAddress());
+
+		// Draw first cube
+		pCommandList->DrawIndexedInstanced(numCubeIndices, 1, 0, 0, 0);
+
+		// Second cube
+		// Set cube 2's constant buffer. you can wee we are adding the size of ConstantBufferPerObject to the constant buffer
+		// resource heapsaddress. This is because cube1's constatnt buffer is stored at the beginning of the resource heap,
+		// while cube2's constant buffer data is storeed after (256 bits from the start of the heap).
+		pCommandList->SetGraphicsRootConstantBufferView(0, pConstantBufferUploadHeaps[frameIndex].Get()->GetGPUVirtualAddress() + ConstantBufferPerObjectAlignedSize);
+
+		//cube.Draw(camera.GetViewMatrix() * camera.GetProjectionMatrix(), 0, pConstantBufferUploadHeaps[frameIndex].Get()->GetGPUVirtualAddress());
+
+		// Draw second cube
+		pCommandList->DrawIndexedInstanced(numCubeIndices, 1, 0, 0, 0);
 	}
 	else
 	{
@@ -925,23 +943,6 @@ void Graphics::UpdatePipeline()
 		pCommandList->ResourceBarrier(1, &transition);
 	}
 	
-	// First cube
-	// Set cube1's constant buffer
-	pCommandList->SetGraphicsRootConstantBufferView(0, pConstantBufferUploadHeaps[frameIndex].Get()->GetGPUVirtualAddress());
-
-	// Draw first cube
-	pCommandList->DrawIndexedInstanced(numCubeIndices, 1, 0, 0, 0);
-
-	// Second cube
-	// Set cube 2's constant buffer. you can wee we are adding the size of ConstantBufferPerObject to the constant buffer
-	// resource heapsaddress. This is because cube1's constatnt buffer is stored at the beginning of the resource heap,
-	// while cube2's constant buffer data is storeed after (256 bits from the start of the heap).
-	pCommandList->SetGraphicsRootConstantBufferView(0, pConstantBufferUploadHeaps[frameIndex].Get()->GetGPUVirtualAddress() + ConstantBufferPerObjectAlignedSize);
-
-	//cube.Draw(camera.GetViewMatrix() * camera.GetProjectionMatrix(), 0, pConstantBufferUploadHeaps[frameIndex].Get()->GetGPUVirtualAddress());
-
-	// Draw second cube
-	pCommandList->DrawIndexedInstanced(numCubeIndices, 1, 0, 0, 0);
 
 
 	// Transition the "framework" render target from the render target state to the present state. If the debug layer is enabled you will recieve a
@@ -970,6 +971,62 @@ bool Graphics::InitializeScene()
 	return true;
 }
 
+void Graphics::CreateCameraBuffer()
+{
+	uint32_t nbMatrix = 4; // view, perspective, viewInv, perspectiveInv
+	m_cameraBufferSize = nbMatrix * sizeof(XMMATRIX);
+
+	// Create the constant buffer for all matrices
+	m_cameraBuffer = nv_helpers_dx12::CreateBuffer(
+		pDevice.Get(), m_cameraBufferSize, D3D12_RESOURCE_FLAG_NONE,
+		D3D12_RESOURCE_STATE_GENERIC_READ, nv_helpers_dx12::kUploadHeapProps);
+
+	// Create a descriptor heap that will be used by the rasterization shaders
+	m_constHeap = nv_helpers_dx12::CreateDescriptorHeap(
+		pDevice.Get(), 1, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true);
+
+	// Describe and create the constant buffer view.
+	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+	cbvDesc.BufferLocation = m_cameraBuffer->GetGPUVirtualAddress();
+	cbvDesc.SizeInBytes = m_cameraBufferSize;
+
+	// Get a handle to the heap memory on the CPU side, to be able to write the
+	// descriptors directly
+	D3D12_CPU_DESCRIPTOR_HANDLE srvHandle =
+		m_constHeap->GetCPUDescriptorHandleForHeapStart();
+	pDevice->CreateConstantBufferView(&cbvDesc, srvHandle);
+}
+
+void Graphics::UpdateCameraBuffer()
+{
+	std::vector<XMMATRIX> matrices(4);
+
+	// Initialize the view matrix, ideally this should be based on user
+	// interactions The lookat and perspective matrices used for rasterization are
+	// defined to transform world-space vertices into a [0,1]x[0,1]x[0,1] camera
+	// space
+	matrices[0] = camera.GetViewMatrix();
+
+	float fovAngleY = 45.0f * XM_PI / 180.0f;
+	matrices[1] = camera.GetProjectionMatrix();
+
+	// Raytracing has to do the contrary of rasterization: rays are defined in
+	// camera space, and are transformed into world space. To do this, we need to
+	// store the inverse matrices as well.
+	XMVECTOR det;
+	matrices[2] = XMMatrixInverse(&det, matrices[0]);
+	matrices[3] = XMMatrixInverse(&det, matrices[1]);
+
+	// Copy the matrix contents
+	uint8_t* pData;
+	HRESULT hr = m_cameraBuffer->Map(0, nullptr, (void**)&pData);
+	if (FAILED(hr))
+		__debugbreak();
+
+	memcpy(pData, matrices.data(), m_cameraBufferSize);
+	m_cameraBuffer->Unmap(0, nullptr);
+}
+
 void Graphics::CheckRayTracingSupport()
 {
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5 = {};
@@ -979,15 +1036,27 @@ void Graphics::CheckRayTracingSupport()
 		throw std::runtime_error("Raytracing not supported on device");
 }
 
-Graphics::AccelerationStructureBuffers Graphics::CreateBottomLevelAS(std::vector<std::pair<ComPtr<ID3D12Resource>, uint32_t>> vVertexBuffers)
+Graphics::AccelerationStructureBuffers Graphics::CreateBottomLevelAS(std::vector<std::pair<ComPtr<ID3D12Resource>, uint32_t>> vVertexBuffers, std::vector<std::pair<ComPtr<ID3D12Resource>, uint32_t>> vIndexBuffers)
 {
 	nv_helpers_dx12::BottomLevelASGenerator bottomLevelAS;
 
-	for (const auto& buffer : vVertexBuffers) {
-		bottomLevelAS.AddVertexBuffer(buffer.first.Get(), 0, buffer.second,
-			5 * sizeof(float), 0, 0);
-	}
+	// Adding all vertex buffers and not transforming their position.
+	for (size_t i = 0; i < vVertexBuffers.size(); i++) {
+		// for (const auto &buffer : vVertexBuffers) {
+		if (i < vIndexBuffers.size() && vIndexBuffers[i].second > 0)
+		{
 
+			bottomLevelAS.AddVertexBuffer(vVertexBuffers[i].first.Get(), 0,
+				vVertexBuffers[i].second, sizeof(Vertex3D),
+				vIndexBuffers[i].first.Get(), 0,
+				vIndexBuffers[i].second, nullptr, 0, true);
+		}
+		else
+		{
+
+			bottomLevelAS.AddVertexBuffer(vVertexBuffers[i].first.Get(), 0, vVertexBuffers[i].second, sizeof(Vertex3D), 0, 0);
+		}
+	}
 	UINT64 scratchSizeInBytes = 0;
 	UINT64 resultSizeInBytes = 0;
 
@@ -1046,8 +1115,9 @@ void Graphics::CreateTopLevelAS(const std::vector<std::pair<ComPtr<ID3D12Resourc
 
 void Graphics::CreateAccelerationStructures()
 {
+	// Build the bottom AS from the Triangle vertex buffer
 	AccelerationStructureBuffers bottomLevelBuffers =
-		CreateBottomLevelAS({ {pVertexBuffer.Get(), 3} });
+		CreateBottomLevelAS({ {pVertexBuffer.Get(), 4} }, { {pIndexBuffer.Get(), 12} });
 
 	m_instances = { {bottomLevelBuffers.pResult, XMMatrixIdentity()} };
 	CreateTopLevelAS(m_instances);
@@ -1062,9 +1132,8 @@ ComPtr<ID3D12RootSignature> Graphics::CreateRayGenSignature()
 		{ {0 /*u0*/, 1 /*1 descriptor */, 0 /*use the implicit register space 0*/,
 		  D3D12_DESCRIPTOR_RANGE_TYPE_UAV /* UAV representing the output buffer*/,
 		  0 /*heap slot where the UAV is defined*/},
-		 {0 /*t0*/, 1, 0,
-		  D3D12_DESCRIPTOR_RANGE_TYPE_SRV /*Top-level acceleration structure*/,
-		  1} });
+		 {0 /*t0*/, 1, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV /*Top-level acceleration structure*/, 1},
+		 {0 /*b0*/, 1, 0, D3D12_DESCRIPTOR_RANGE_TYPE_CBV /*Camera parameters*/, 2} });
 
 	return rsc.Generate(pDevice.Get(), true);
 }
@@ -1078,6 +1147,8 @@ ComPtr<ID3D12RootSignature> Graphics::CreateMissSignature()
 ComPtr<ID3D12RootSignature> Graphics::CreateHitSignature()
 {
 	nv_helpers_dx12::RootSignatureGenerator rsc;
+	rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_SRV, 0 /*t0*/); // vertices and colors
+	rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_SRV, 1 /*t1*/); // indices
 	return rsc.Generate(pDevice.Get(), true);
 }
 
@@ -1150,7 +1221,7 @@ void Graphics::CreateRaytracingOutputBuffer()
 void Graphics::CreateShaderResourceHeap()
 {
 	m_srvUavHeap = nv_helpers_dx12::CreateDescriptorHeap(
-		pDevice.Get(), 2, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true);
+		pDevice.Get(), 3, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true);
 
 	D3D12_CPU_DESCRIPTOR_HANDLE srvHandle =
 		m_srvUavHeap->GetCPUDescriptorHandleForHeapStart();
@@ -1167,10 +1238,17 @@ void Graphics::CreateShaderResourceHeap()
 	srvDesc.Format = DXGI_FORMAT_UNKNOWN;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.RaytracingAccelerationStructure.Location =
-		m_topLevelASBuffers.pResult->GetGPUVirtualAddress();
-	
+	srvDesc.RaytracingAccelerationStructure.Location = m_topLevelASBuffers.pResult->GetGPUVirtualAddress();
 	pDevice->CreateShaderResourceView(nullptr, &srvDesc, srvHandle);
+
+	srvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	// Describe and create a constant buffer view for the camera
+	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+	cbvDesc.BufferLocation = m_cameraBuffer->GetGPUVirtualAddress();
+	cbvDesc.SizeInBytes = m_cameraBufferSize;
+	pDevice->CreateConstantBufferView(&cbvDesc, srvHandle);
+	
 }
 
 void Graphics::CreateShaderBindingTable()
@@ -1185,7 +1263,8 @@ void Graphics::CreateShaderBindingTable()
 
 	m_sbtHelper.AddMissProgram(L"Miss", {});
 
-	m_sbtHelper.AddHitGroup(L"HitGroup", {});
+	m_sbtHelper.AddHitGroup(L"HitGroup", { (void*)(pVertexBuffer->GetGPUVirtualAddress()),
+									   (void*)(pIndexBuffer->GetGPUVirtualAddress()) });
 	
 	uint32_t sbtSize = m_sbtHelper.ComputeSBTSize();
 
@@ -1541,6 +1620,7 @@ void Graphics::Cleanup()
 void Graphics::Update()
 {
 	using namespace DirectX;
+	UpdateCameraBuffer();
 	// Create rotation matricies
 	XMMATRIX rotXMat = XMMatrixRotationX(0.0001f);
 	XMMATRIX rotYMat = XMMatrixRotationY(0.0002f);

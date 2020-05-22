@@ -40,6 +40,12 @@ private:
 	bool InitializeScene();
 	void UpdateImGui();
 
+	void CreateCameraBuffer();
+	void UpdateCameraBuffer();
+	ComPtr<ID3D12Resource> m_cameraBuffer;
+	ComPtr<ID3D12DescriptorHeap> m_constHeap;
+	uint32_t m_cameraBufferSize = 0;
+
 #pragma region Ray Tracing
 	bool m_raster = true;
 	struct AccelerationStructureBuffers
@@ -55,7 +61,10 @@ private:
 	std::vector<std::pair<ComPtr<ID3D12Resource>, DirectX::XMMATRIX>> m_instances;
 
 	void CheckRayTracingSupport();
-	AccelerationStructureBuffers CreateBottomLevelAS(std::vector<std::pair<ComPtr<ID3D12Resource>, uint32_t>> vVertexBuffers);
+	AccelerationStructureBuffers CreateBottomLevelAS(
+		std::vector<std::pair<ComPtr<ID3D12Resource>, uint32_t>> vVertexBuffers,
+		std::vector<std::pair<ComPtr<ID3D12Resource>, uint32_t>> vIndexBuffers =
+		{});
 	void CreateTopLevelAS(const std::vector<std::pair<ComPtr<ID3D12Resource>, DirectX::XMMATRIX>>& instances);
 	void CreateAccelerationStructures();
 	ComPtr<ID3D12RootSignature> CreateRayGenSignature();
