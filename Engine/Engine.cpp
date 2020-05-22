@@ -56,6 +56,15 @@ void Engine::Update()
 		cameraSpeed = 0.1f;
 	}
 
+	m_ChangeRenderPathDelay -= 0.01 * deltaTime;
+	if (m_ChangeRenderPathDelay <= 0.0f)
+		m_CanChangeRenderPath = true;
+	if (keyboard.KeyIsPressed(' ') && m_CanChangeRenderPath)
+	{
+		m_CanChangeRenderPath = false;
+		m_ChangeRenderPathDelay = 3.0f;
+		this->gfx.SetRasterEnabled(!this->gfx.GetIsRasterEnabled());
+	}
 
 	if (keyboard.KeyIsPressed('W'))
 	{

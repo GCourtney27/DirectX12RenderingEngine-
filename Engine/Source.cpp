@@ -33,7 +33,7 @@ int WINAPI wWinMain(
 	}
 
 	Engine engine;
-	if (engine.Initialize(hInstance, L"Insight Engine", L"Hello World!", nCmdShow, 1600, 900))
+	if (engine.Initialize(hInstance, L"DX12 Engine", L"Hello World!", nCmdShow, 1600, 900))
 	{
 		while (engine.ProccessMessages() == true)
 		{

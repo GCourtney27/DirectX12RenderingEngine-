@@ -41,8 +41,8 @@ std::vector<AdapterData> AdapterReader::GetAdapters()
 			continue;
 		}
 
-		// We want a device that is compatible with Direct3D 12 (feature level 11 or higher)
-		hr = D3D12CreateDevice(pAdapter, D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr);
+		// We want a device that is compatible with Direct3D 12 (feature level 12 or higher)
+		hr = D3D12CreateDevice(pAdapter, D3D_FEATURE_LEVEL_12_0, _uuidof(ID3D12Device), nullptr);
 		if (SUCCEEDED(hr))
 		{
 			adapterFound = true;

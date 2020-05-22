@@ -28,5 +28,6 @@ private:
 	Timer timer;
 	int windowWidth = 0;
 	int windowHeight = 0;
-
+	bool m_CanChangeRenderPath = true;
+	float m_ChangeRenderPathDelay = 3.0f;
 };
