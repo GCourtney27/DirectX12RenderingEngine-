@@ -435,6 +435,7 @@ bool Graphics::InitializeDirect3D12(HWND hwnd)
 		{ -0.5f, -0.5f,  0.5f, 0.0f, 1.0f, 0.0f },
 	};
 	int vBufferSize = sizeof(vList);
+	numCubeVerticies = vBufferSize / sizeof(Vertex3D);
 
 	// Create default heap
 	// Default heap is memeory on the GPU. Only the GPU has access to this memory
@@ -1045,7 +1046,6 @@ Graphics::AccelerationStructureBuffers Graphics::CreateBottomLevelAS(std::vector
 		// for (const auto &buffer : vVertexBuffers) {
 		if (i < vIndexBuffers.size() && vIndexBuffers[i].second > 0)
 		{
-
 			bottomLevelAS.AddVertexBuffer(vVertexBuffers[i].first.Get(), 0,
 				vVertexBuffers[i].second, sizeof(Vertex3D),
 				vIndexBuffers[i].first.Get(), 0,
@@ -1053,7 +1053,6 @@ Graphics::AccelerationStructureBuffers Graphics::CreateBottomLevelAS(std::vector
 		}
 		else
 		{
-
 			bottomLevelAS.AddVertexBuffer(vVertexBuffers[i].first.Get(), 0, vVertexBuffers[i].second, sizeof(Vertex3D), 0, 0);
 		}
 	}
@@ -1116,8 +1115,7 @@ void Graphics::CreateTopLevelAS(const std::vector<std::pair<ComPtr<ID3D12Resourc
 void Graphics::CreateAccelerationStructures()
 {
 	// Build the bottom AS from the Triangle vertex buffer
-	AccelerationStructureBuffers bottomLevelBuffers =
-		CreateBottomLevelAS({ {pVertexBuffer.Get(), 4} }, { {pIndexBuffer.Get(), 12} });
+	AccelerationStructureBuffers bottomLevelBuffers = CreateBottomLevelAS({ {pVertexBuffer.Get(), numCubeVerticies} }, { {pIndexBuffer.Get(), numCubeIndices} });
 
 	m_instances = { {bottomLevelBuffers.pResult, XMMatrixIdentity()} };
 	CreateTopLevelAS(m_instances);

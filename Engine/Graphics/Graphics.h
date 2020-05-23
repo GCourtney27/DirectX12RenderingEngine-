@@ -108,8 +108,6 @@ private:
 																  // as we have allocators (more if we want to know when the gpu is finished with an asset)
 	ComPtr<ID3D12PipelineState> pPipelineStateObject; // PSO containg a pipeline state
 	ComPtr<ID3D12RootSignature> pRootSignature; // Root signature defines data shaders will access
-	ComPtr<ID3D12Resource> pIndexBuffer; // A default buffer in GPU memory that we will load index data for our triangle into
-	D3D12_INDEX_BUFFER_VIEW indexBufferView; // A structure holding information about the index buffer
 	
 	ComPtr<ID3D12Resource> pDepthStencilBuffer; // This is the memory for out depth buffer. It will also be used tor stencil buffer
 	ComPtr<ID3D12DescriptorHeap> pDSDescriptorHeap; // This is a heap for oue depth/stencil buffer descriptor
@@ -146,13 +144,17 @@ private:
 
 	ConstantBuffer<ConstantBufferPerObject> cb_vertexShader;
 
-	int numCubeIndices; // The number of indices to draw the cube
-
 	D3D12_VIEWPORT viewPort; // Area that the output from the rasterizer will be stretched to
 	D3D12_RECT scissorRect; // The area to draw in. Pixels outside that area will not be drawn
+
 	ComPtr<ID3D12Resource> pVertexBuffer; // A default buffer in GPU memory that we will load vertex data for out triangles into
 	D3D12_VERTEX_BUFFER_VIEW vertexbufferView; // A structure containing a pointe to the vetex data in GPU memory
 												// The total size of the buffer, and the size of each element (vertex)
+	ComPtr<ID3D12Resource> pIndexBuffer; // A default buffer in GPU memory that we will load index data for our triangle into
+	D3D12_INDEX_BUFFER_VIEW indexBufferView; // A structure holding information about the index buffer
+	int numCubeIndices; // The number of indices to draw the cube
+	int numCubeVerticies; // The number of indices to draw the cube
+
 public:
 	HANDLE fenceEvent; // An handle to an event when our fence is unlocked by the GPU
 private:
